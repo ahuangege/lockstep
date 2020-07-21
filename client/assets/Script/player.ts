@@ -8,6 +8,7 @@
 const { ccclass, property } = cc._decorator;
 import * as util from "./util";
 import { Gun } from "./gun";
+import { Decimal } from "./Decimal";
 
 @ccclass
 export class Player extends cc.Component {
@@ -23,11 +24,11 @@ export class Player extends cc.Component {
         this.allHurtLabel = this.node.getChildByName("allHurt").getComponent(cc.Label);
     }
 
-    init(uid: number, nickname: string) {
+    init(uid: number, nickname: string, isDown: boolean) {
         this.uid = uid;
         util.getChildByName(this.node, "name").getComponent(cc.Label).string = nickname;
         this.gun = util.getChildByName(this.node, "gun").getComponent(Gun);
-        this.gun.init(this, uid);
+        this.gun.init(this, uid, isDown);
     }
 
     updateF(dt: number) {

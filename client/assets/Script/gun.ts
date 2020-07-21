@@ -16,14 +16,16 @@ const { ccclass, property } = cc._decorator;
 export class Gun extends cc.Component {
     private player: Player;
     private uid: number;
-    private pos: cc.Vec2;
+    private f_x: number;
+    private f_y: number;
     private target: Monster = null;
     private changeTime = 1000;
     private shootTime = 0;
-    init(p: Player, uid: number) {
+    init(p: Player, uid: number, isDown: boolean) {
         this.player = p;
         this.uid = uid;
-        this.pos = cc.v2(Math.floor(this.node.x), Math.floor(this.node.y));
+        this.f_x = 0;
+        this.f_y = isDown ? -200 : 200;
     }
 
     updateF(dt: number) {
@@ -40,7 +42,8 @@ export class Gun extends cc.Component {
         this.shootTime -= dt;
         if (this.shootTime <= 0) {
             this.shootTime = 1000;
-            Game.instance._createBullet(this.pos, this.target, this.player.hurt, this.player.uid);
+            Game.instance._createBullet(this.f_x, this.f_y, this.target, this.player.hurt, this.player.uid);
         }
     }
 }
+

@@ -7,12 +7,14 @@
 
 import { Entity } from "./entity";
 import { Game } from "./game";
+import { Decimal } from "./Decimal";
 
 const { ccclass, property } = cc._decorator;
 
+let kScale = new Decimal(1000);
 @ccclass
 export class Monster extends Entity {
-    public f_x = 0;
+    public f_x: number;
     private blood = 100;
     private speed = 50;
     private bloodLabel: cc.Label;
@@ -26,7 +28,7 @@ export class Monster extends Entity {
     }
 
     updateF(dt: number) {
-        this.f_x += Math.floor(this.speed * dt / 1000);
+        this.f_x += new Decimal(this.speed * dt).div(kScale).floor();
         if (this.f_x > 400) {
             this.die();
         }
@@ -38,7 +40,7 @@ export class Monster extends Entity {
 
     die() {
         Game.instance._delMonster(this);
-        this.alive = false;
+        this.setAlive(false);
         this.node.destroy();
     }
 

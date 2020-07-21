@@ -5,6 +5,7 @@ import * as util from "./util";
 import { network } from "./network";
 import { cmd } from "./cmdClient";
 import { PlayerInfo } from "./playerInfo";
+import { Decimal } from "./Decimal";
 
 const { ccclass, property } = cc._decorator;
 
@@ -16,8 +17,8 @@ enum e_movieFunc {
     paused,     // 暂停
 }
 
-const svrFPS = 4 * 2;   // 客户端数据逻辑帧数
-const frameDt = Math.floor(1000 / svrFPS);  // 每两个逻辑帧之间的时间差（毫秒）
+const svrFPS = 5 * 2;   // 客户端数据逻辑帧数
+const frameDt = 1000 / svrFPS;  // 每两个逻辑帧之间的时间差（毫秒，此demo中必须为整数）
 
 @ccclass
 export class Game extends cc.Component {
@@ -52,7 +53,7 @@ export class Game extends cc.Component {
 
     start() {
         this._setTimeLabel();
-        this._changeReadFrame(svrFPS + 1);
+        this._changeReadFrame(svrFPS);
         network.addHandler(cmd.onFrame, this._svr_onFrame, this);
         network.onClose(this._svr_onClose, this);
         this._init();
@@ -90,7 +91,7 @@ export class Game extends cc.Component {
             }
             let p: Player = util.getChildByName(this.node, "p" + usedId).getComponent(Player);
             this.players.push(p);
-            p.init(one.uid, one.nickname);
+            p.init(one.uid, one.nickname, usedId === 1);
         }
         if (isMovie) {
             for (let one of PlayerInfo.frames) {
@@ -112,7 +113,7 @@ export class Game extends cc.Component {
         network.readMsg();
         this.readTime -= dt;
         if (this.readTime <= 0) {
-            this.readTime = this.readPerTime;
+            this.readTime = this.readPerTime + this.readTime;
             this._readFrame();
         }
     }
@@ -123,7 +124,7 @@ export class Game extends cc.Component {
         this.readTime = 0;
     }
 
-    private _svr_onFrame(msg: I_frameData) { // 服务器每秒发四帧，客户端插入1个空帧，即客户端每秒8个数据帧
+    private _svr_onFrame(msg: I_frameData) { // 服务器每秒发5帧，客户端每帧后插入1个空帧，即客户端每秒10个数据帧
         this.frameArr.push(msg);
         this.frameArr.push({} as any);
     }
@@ -215,11 +216,11 @@ export class Game extends cc.Component {
     }
 
 
-    _createBullet(pos: cc.Vec2, target: Monster, hurt: number, uid: number) {
+    _createBullet(x: number, y: number, target: Monster, hurt: number, uid: number) {
         let node = cc.instantiate(this.bulletPrefab);
         node.parent = this.nodeParent;
         let com = node.getComponent(Bullet);
-        com.init(pos, target, hurt, uid);
+        com.init(x, y, target, hurt, uid);
         this.bullets.push(com);
     }
 
@@ -232,7 +233,7 @@ export class Game extends cc.Component {
     }
 
     private btn_outRoom() {
-        cc.director.loadScene("test");
+        cc.director.loadScene("login");
     }
 
     private btn_movieFunc() {
@@ -251,7 +252,7 @@ export class Game extends cc.Component {
             label.string = "暂停";
         } else {
             this.movieFunc = e_movieFunc.x1;
-            this._changeReadFrame(svrFPS + 1);
+            this._changeReadFrame(svrFPS);
             // console.log(this.)
             label.string = "x1";
         }

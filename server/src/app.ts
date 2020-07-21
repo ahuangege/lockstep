@@ -1,11 +1,11 @@
 
-import { createApp, Application, Session, connector } from "mydog";
-import { RoomMgr } from "./app/roomMgr";
+import { createApp, connector } from "mydog";
 let app = createApp();
+import { RoomMgr } from "./app/roomMgr";
 
 
-app.setConnectorConfig({ "connector": connector.connectorWs })
-app.setEncodeDecodeConfig({ "msgDecode": msgDecode, "msgEncode": msgEncode })
+app.setConfig("connector", { "connector": connector.connectorWs })
+app.setConfig("encodeDecode", { "msgDecode": msgDecode, "msgEncode": msgEncode })
 
 app.configure("gate", () => {
     app.set("roomMgr", new RoomMgr(app));
@@ -29,9 +29,6 @@ function msgDecode(cmdId: number, msgBuf: Buffer) {
 }
 
 function msgEncode(cmdId: number, msg: any) {
-    if (msg === undefined) {
-        msg = null;
-    }
     let msgStr = JSON.stringify(msg);
     console.log("---rsp---", app.routeConfig[cmdId], msgStr);
     return Buffer.from(msgStr);

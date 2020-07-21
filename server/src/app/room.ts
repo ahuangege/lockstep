@@ -18,7 +18,7 @@ export class Room {
     constructor(roomId: number, app: Application) {
         this.roomId = roomId;
         this.app = app;
-        this.timer = setInterval(this.update.bind(this), 1000 / 4);
+        this.timer = setInterval(this.update.bind(this), 1000 / 5);
         this.randomSeed = Math.floor(Math.random() * 100000);
     }
 
