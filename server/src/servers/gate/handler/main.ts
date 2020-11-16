@@ -1,4 +1,4 @@
-import { Application, Session } from "mydog";
+import { Application, Session, app } from "mydog";
 import { RoomMgr } from "../../../app/roomMgr";
 
 
@@ -18,7 +18,6 @@ export default class Handler {
         }
         let uid = this.roomMgr.enter(msg.nickname);
         session.bind(uid);
-        session.setCloseCb(closeCb);
         next({ "uid": uid, "nickname": msg.nickname });
     }
 
@@ -56,7 +55,7 @@ export default class Handler {
     }
 }
 
-function closeCb(app: Application, session: Session) {
+export function onUserLeave(session: Session) {
     let uid = session.uid;
     if (!uid) {
         return;
