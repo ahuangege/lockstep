@@ -1,5 +1,3 @@
-import { cmd } from "./cmdClient";
-
 
 let ws: WebSocket = null;
 let route: string[] = [];
@@ -20,14 +18,19 @@ export class network {
      */
     static connect(host: string, port: number) {
         network.disconnect();
-        tmpBuf = { "len": 0, "buffer": new Uint8Array(0) };
+        tmpBuf.len = 0;
+        tmpBuf.buffer = new Uint8Array(0);
         let url = "ws://" + host + ":" + port;
         ws = new WebSocket(url);
         ws.binaryType = 'arraybuffer';
         ws.onopen = function () {
             // 握手
-            let buffer = new Uint8Array(1);
-            buffer[0] = 2 & 0xff;
+            let buffer = new Uint8Array(5);
+            buffer[0] = 1 >> 24 & 0xff;
+            buffer[1] = 1 >> 16 & 0xff;
+            buffer[2] = 1 >> 8 & 0xff;
+            buffer[3] = 1 & 0xff;
+            buffer[4] = 2 & 0xff;
             ws.send(buffer.buffer);
 
         };
@@ -39,18 +42,13 @@ export class network {
             clearInterval(heartbeatTimer);
             clearTimeout(heartbeatResTimeoutTimer);
             heartbeatResTimeoutTimer = null;
-            ws = null;
             msgCache.push({ "id": openOrClose.close, "data": null });
+            ws = null;
         };
         ws.onmessage = function (event) {
             handleMsg(new Uint8Array(event.data));
         };
     }
-
-    static isConnected() {
-        return !!ws;
-    }
-
 
     /**
      * 断开连接
@@ -63,12 +61,12 @@ export class network {
             ws.onmessage = function () { };
             ws.close();
             ws = null;
-
+            tmpBuf.len = 0;
+            tmpBuf.buffer = new Uint8Array(0);
+            clearInterval(heartbeatTimer);
+            clearTimeout(heartbeatResTimeoutTimer);
+            heartbeatResTimeoutTimer = null;
         }
-        msgCache = [];
-        clearInterval(heartbeatTimer);
-        clearTimeout(heartbeatResTimeoutTimer);
-        heartbeatResTimeoutTimer = null;
     }
 
 
@@ -114,7 +112,7 @@ export class network {
      * @param cb 
      * @param self 
      */
-    static addHandler(cmd: cmd, cb: (msg?: any) => void, self: any) {
+    static addHandler(cmd: string, cb: (msg?: any) => void, self: any) {
         let cmdIndex = route.indexOf(cmd);
         if (cmdIndex === -1) {
             console.warn("cmd not exists:", cmd);
@@ -123,20 +121,6 @@ export class network {
         handlers[cmdIndex] = cb.bind(self);
         bindedObj[cmdIndex] = self;
     }
-
-    // /**
-    //  * 移除消息监听
-    //  * @param cmd 
-    //  */
-    // static removeHandler(cmd: cmd) {
-    //     let cmdIndex = route.indexOf(cmd);
-    //     if (cmdIndex === -1) {
-    //         console.warn("cmd not exists:", cmd);
-    //         return;
-    //     }
-    //     delete handlers[cmdIndex];
-    //     delete bindedObj[cmdIndex];
-    // }
 
     /**
      * 移除绑定的消息监听
@@ -156,7 +140,7 @@ export class network {
      * @param cmd 
      * @param data 
      */
-    static sendMsg(cmd: cmd, data?: any) {
+    static sendMsg(cmd: string, data?: any) {
         if (!ws || ws.readyState !== 1) {
             console.warn("ws is null");
             return;
@@ -167,7 +151,13 @@ export class network {
             console.warn("cmd not exists:", cmd);
             return;
         }
+        if (data === undefined) {
+            data = null;
+        }
         let buffer = encode(cmdIndex, data);
+        // let buffer2 = new Uint8Array(buffer.length * 2);
+        // copyArray(buffer2, 0, buffer, 0, buffer.length);
+        // copyArray(buffer2, buffer.length, buffer, 0, buffer.length);
         ws.send(buffer.buffer);
     }
 
@@ -186,40 +176,37 @@ export class network {
 }
 
 
-
-
-
-
 function encode(cmdIndex: number, data: any) {
-    if (data === undefined) {
-        data = null;
-    }
-    let msgArr = strencode(JSON.stringify(data));
-    let msg_len = msgArr.length + 3;
-    let buffer = new Uint8Array(msg_len);
+    let dataBuf = strencode(JSON.stringify(data));
+    let msg_len = dataBuf.length + 3;
+    let buffer = new Uint8Array(msg_len + 4);
     let index = 0;
+    buffer[index++] = msg_len >> 24 & 0xff;
+    buffer[index++] = msg_len >> 16 & 0xff;
+    buffer[index++] = msg_len >> 8 & 0xff;
+    buffer[index++] = msg_len & 0xff;
     buffer[index++] = 1 & 0xff;
-    buffer[index++] = (cmdIndex >> 8) & 0xff;
+    buffer[index++] = cmdIndex >> 8 & 0xff;
     buffer[index++] = cmdIndex & 0xff;
-    buffer.set(msgArr, index);
-    // copyArray(buffer, index, msgArr, 0, msgArr.length);
+    copyArray(buffer, index, dataBuf, 0, dataBuf.length);
     return buffer;
 }
 
 
-function handleMsg(data) {
+function handleMsg(data: Uint8Array) {
     try {
-        if (data[0] === 1) {
-            let endBuf = new Uint8Array(data.length - 3);
-            copyArray(endBuf, 0, data, 3, data.length - 3);
-            msgCache.push({ "id": (data[1] << 8) | data[2], "data": JSON.parse(strdecode(endBuf)) });
-        } else if (data[0] === 2) { //握手
-            let endBuf = new Uint8Array(data.length - 1);
-            copyArray(endBuf, 0, data, 1, data.length - 1);
-            handshakeOver(JSON.parse(strdecode(endBuf)));
-        } else if (data[0] === 3) {  // 心跳回调
-            clearTimeout(heartbeatResTimeoutTimer);
-            heartbeatResTimeoutTimer = null;
+        let index = 0;
+        while (index < data.length) {
+            let msgLen = (data[index] << 24) | (data[index + 1] << 16) | (data[index + 2] << 8) | data[index + 3];
+            if (data[index + 4] === 1) {
+                msgCache.push({ "id": (data[index + 5] << 8) | data[index + 6], "data": JSON.parse(strdecode(data.subarray(index + 7, index + 4 + msgLen))) });
+            } else if (data[index + 4] === 2) { //握手
+                handshakeOver(JSON.parse(strdecode(data.subarray(index + 5, index + 4 + msgLen))));
+            } else if (data[index + 4] === 3) {  // 心跳回调
+                clearTimeout(heartbeatResTimeoutTimer);
+                heartbeatResTimeoutTimer = null;
+            }
+            index += msgLen + 4;
         }
     } catch (e) {
         console.log(e);
@@ -236,12 +223,17 @@ function handshakeOver(msg) {
 
 function sendHeartbeat() {
     // 心跳
-    let buffer = new Uint8Array(1);
-    buffer[0] = 3 & 0xff;
+    let buffer = new Uint8Array(5);
+    buffer[0] = 1 >> 24 & 0xff;
+    buffer[1] = 1 >> 16 & 0xff;
+    buffer[2] = 1 >> 8 & 0xff;
+    buffer[3] = 1 & 0xff;
+    buffer[4] = 3 & 0xff;
     ws.send(buffer.buffer);
 
     if (heartbeatResTimeoutTimer === null) {
         heartbeatResTimeoutTimer = setTimeout(function () {
+            msgCache.push({ "id": openOrClose.close, "data": null })
             network.disconnect();
         }, 5 * 1000);
     }
@@ -258,7 +250,7 @@ function strencode(str: string) {
             byteArray.push(0xc0 | (charCode >> 6), 0x80 | (charCode & 0x3f));
         } else if (charCode <= 0xffff) {
             byteArray.push(0xe0 | (charCode >> 12), 0x80 | ((charCode & 0xfc0) >> 6), 0x80 | (charCode & 0x3f));
-        } else if (charCode <= 0x0010ffff) {
+        } else {
             byteArray.push(0xf0 | (charCode >> 18), 0x80 | ((charCode & 0x3f000) >> 12), 0x80 | ((charCode & 0xfc0) >> 6), 0x80 | (charCode & 0x3f));
         }
     }
@@ -289,10 +281,10 @@ function strdecode(bytes: Uint8Array) {
         array.push(charCode);
     }
     return String.fromCharCode.apply(null, array);
-};
+}
 
-function copyArray(dest, doffset, src, soffset, length) {
+function copyArray(dest: Uint8Array, doffset: number, src: Uint8Array, soffset: number, length: number) {
     for (let index = 0; index < length; index++) {
         dest[doffset++] = src[soffset++];
     }
-};
+}
