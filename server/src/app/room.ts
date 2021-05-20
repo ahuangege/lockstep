@@ -26,7 +26,8 @@ export class Room {
         this.players = players;
         let arr: { "nickname": string, "uid": number }[] = [];
         for (let one of this.players) {
-            this.app.applySession(one.uid, { "roomId": this.roomId });
+            let session = this.app.getSession(one.uid);
+            session.set({ "roomId": this.roomId });
             one.isMatching = false;
             this.uids.push(one.uid);
             arr.push({ "uid": one.uid, "nickname": one.nickname });
@@ -82,7 +83,8 @@ export class Room {
         clearInterval(this.timer);
         let nameArr: string[] = [];
         for (let one of this.players) {
-            this.app.applySession(one.uid, { "roomId": 0 });
+            let session = this.app.getSession(one.uid);
+            session.set({ "roomId": 0 });
             nameArr.push(one.nickname);
         }
         let roomMgr = this.app.get<RoomMgr>("roomMgr");

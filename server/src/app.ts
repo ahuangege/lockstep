@@ -6,7 +6,7 @@ import { RoomMgr } from "./app/roomMgr";
 import { onUserLeave } from "./servers/gate/handler/main";
 
 
-app.setConfig("connector", { "connector": connector.connectorWs, clientOffCb: onUserLeave })
+app.setConfig("connector", { "connector": connector.Ws, clientOffCb: onUserLeave })
 app.setConfig("encodeDecode", { "msgDecode": msgDecode, "msgEncode": msgEncode })
 
 app.configure("gate", () => {
