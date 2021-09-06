@@ -1,14 +1,15 @@
 
 let ws: WebSocket = null;
 let route: string[] = [];
-let heartbeatTimer: NodeJS.Timeout = null;
-let heartbeatResTimeoutTimer: NodeJS.Timeout = null;
+let heartbeatTimer: any = null;
+let heartbeatResTimeoutTimer: any = null;
 
 let handlers: { [cmdIndex: number]: Function } = {};
 let bindedObj: { [cmdIndex: number]: any } = {};
 let msgCache: { "id": number, "data": any }[] = [];
 let openOrClose = { "open": -1, "close": -2 };
 let tmpBuf = { "len": 0, "buffer": new Uint8Array(0) };
+let md5 = "";
 
 export class network {
     /**
@@ -25,12 +26,17 @@ export class network {
         ws.binaryType = 'arraybuffer';
         ws.onopen = function () {
             // 握手
-            let buffer = new Uint8Array(5);
-            buffer[0] = 1 >> 24 & 0xff;
-            buffer[1] = 1 >> 16 & 0xff;
-            buffer[2] = 1 >> 8 & 0xff;
-            buffer[3] = 1 & 0xff;
+            let md5Msg = strencode(JSON.stringify({ "md5": md5 }));
+            let msgLen = 1 + md5Msg.length;
+            let buffer = new Uint8Array(5 + md5Msg.length);
+            buffer[0] = msgLen >> 24 & 0xff;
+            buffer[1] = msgLen >> 16 & 0xff;
+            buffer[2] = msgLen >> 8 & 0xff;
+            buffer[3] = msgLen & 0xff;
             buffer[4] = 2 & 0xff;
+            for (let i = 0; i < md5Msg.length; i++) {
+                buffer[i + 5] = md5Msg[i];
+            }
             ws.send(buffer.buffer);
 
         };
@@ -155,9 +161,6 @@ export class network {
             data = null;
         }
         let buffer = encode(cmdIndex, data);
-        // let buffer2 = new Uint8Array(buffer.length * 2);
-        // copyArray(buffer2, 0, buffer, 0, buffer.length);
-        // copyArray(buffer2, buffer.length, buffer, 0, buffer.length);
         ws.send(buffer.buffer);
     }
 
@@ -213,8 +216,11 @@ function handleMsg(data: Uint8Array) {
     }
 }
 
-function handshakeOver(msg) {
-    route = msg.route;
+function handshakeOver(msg: { "route": string[], "md5": string, "heartbeat": number }) {
+    md5 = msg.md5;
+    if (msg.route) {
+        route = msg.route;
+    }
     if (msg.heartbeat > 0) {
         heartbeatTimer = setInterval(sendHeartbeat, msg.heartbeat * 1000);
     }
