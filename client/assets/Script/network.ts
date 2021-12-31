@@ -176,6 +176,10 @@ export class network {
         }
     }
 
+    static isConnected() {
+        return !!ws
+    }
+
 }
 
 

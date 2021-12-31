@@ -18,7 +18,8 @@ export class Bullet extends Entity {
     private uid: number = 0;
 
     init(x: number, y: number, target: Monster, hurt: number, uid: number) {
-        this.node.position = cc.v2(x, y);
+        this.node.x = x;
+        this.node.y = y;
         this.target = target;
         this.f_x = x;
         this.f_y = y;
